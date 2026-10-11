@@ -1,4 +1,4 @@
-name: Beijing Telecom CF IP
+name: Generate Beijing Telecom BestCF
 
 on:
   workflow_dispatch:
@@ -9,36 +9,74 @@ permissions:
   contents: write
 
 jobs:
-  run-task:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fetch and Format Telecom IPs
+      - name: Fetch and Filter Beijing Telecom IPs
         run: |
           mkdir -p ./bestcf/
-          OUTPUT_FILE="./bestcf/ctcc-ip.txt"
-          > "$OUTPUT_FILE"
+          OUTPUT="./bestcf/ctcc-ip.txt"
+          > "$OUTPUT"
+          TEMP_RAW=$(mktemp)
 
-          # 1. 获取动态电信优选 IP 列表（若拉取失败则降级重试）
-          RAW_DATA=$(curl -sSL --connect-timeout 10 "https://addressesapi.090227.xyz/CloudFlareYes" || true)
+          # 1. 抓取国内高可用探针接口
+          curl -sSL --connect-timeout 10 --max-time 20 "https://addressesapi.090227.xyz/CloudFlareYes" >> "$TEMP_RAW" || true
+          curl -sSL --connect-timeout 10 --max-time 20 "https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressesapi.txt" >> "$TEMP_RAW" || true
 
-          # 2. 提取 IPv4（取前 5 个）并编号
-          IPV4_LIST=$(echo "$RAW_DATA" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 5)
-          INDEX=1
-          for ip in $IPV4_LIST; do
-            echo "${ip}#BJ-CT_v4_${INDEX}" >> "$OUTPUT_FILE"
-            INDEX=$((INDEX + 1))
+          # 2. 优先提取明确标记为“北京”的节点
+          V4_POOL=$(grep -E '北京|BJ' "$TEMP_RAW" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | head -n 5)
+
+          # 3. 数量不足 5 个时，补充对北方电信/北京电信出口友好的 Cloudflare 网段（162.159.* / 172.64.*）
+          if [ $(echo "$V4_POOL" | sed '/^$/d' | wc -l) -lt 5 ]; then
+            SUPP_V4=$(grep -Eo '162\.159\.[0-9]{1,3}\.[0-9]{1,3}|172\.64\.(14[0-9]|15[0-9])\.[0-9]{1,3}' "$TEMP_RAW" | sort -u | head -n 5)
+            V4_POOL=$(echo -e "${V4_POOL}\n${SUPP_V4}" | sed '/^$/d' | sort -u | head -n 5)
+          fi
+
+          # 4. 再次兜底：提取任意电信优选 IP 补齐至 5 个
+          if [ $(echo "$V4_POOL" | sed '/^$/d' | wc -l) -lt 5 ]; then
+            FALLBACK_V4=$(grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' "$TEMP_RAW" | sort -u | head -n 5)
+            V4_POOL=$(echo -e "${V4_POOL}\n${FALLBACK_V4}" | sed '/^$/d' | sort -u | head -n 5)
+          fi
+
+          # 写入 IPv4 列表
+          IDX=1
+          for ip in $V4_POOL; do
+            if [ -n "$ip" ]; then
+              echo "${ip}#BJ-CT_v4_${IDX}" >> "$OUTPUT"
+              IDX=$((IDX + 1))
+            fi
           done
 
-          # 3. 提取 IPv6（取前 3 个）并格式化包裹括号
-          IPV6_LIST=$(echo "$RAW_DATA" | grep -Eo '([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:' | head -n 3)
-          INDEX=1
-          for ip in $IPV6_LIST; do
-            echo "[${ip}]#BJ-CT_v6_${INDEX}" >> "$OUTPUT_FILE"
-            INDEX=$((INDEX + 1))
+          # 5. 提取 IPv6 节点（取前 3 个）
+          V6_POOL=$(grep -Eo '([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}:(:[0-9a-fA-F]{1,4}){1,6}' "$TEMP_RAW" | sort -u | head -n 3)
+          IDX=1
+          for ip in $V6_POOL; do
+            if [ -n "$ip" ]; then
+              echo "[${ip}]#BJ-CT_v6_${IDX}" >> "$OUTPUT"
+              IDX=$((IDX + 1))
+            fi
           done
+
+          # 网络全断兜底保护：若最终为空，写入基线备用节点
+          if [ ! -s "$OUTPUT" ]; then
+            cat << 'EOF' > "$OUTPUT"
+          162.159.35.20#BJ-CT_v4_1
+          172.64.147.110#BJ-CT_v4_2
+          172.64.155.159#BJ-CT_v4_3
+          172.64.150.64#BJ-CT_v4_4
+          172.64.144.224#BJ-CT_v4_5
+          [2606:4700:53::ed49:aad6]#BJ-CT_v6_1
+          [2a06:98c1:3105::c695:78d0]#BJ-CT_v6_2
+          [2606:4700:52::e33a:8a05]#BJ-CT_v6_3
+          EOF
+          fi
+
+          rm -f "$TEMP_RAW"
+          echo "=== Generated ctcc-ip.txt ==="
+          cat "$OUTPUT"
 
       - name: Deploy to Branch
         uses: JamesIves/github-pages-deploy-action@v4
