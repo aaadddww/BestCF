@@ -18,8 +18,14 @@ jobs:
       - name: Get BJ Telecom IP
         run: |
           mkdir -p ./bestcf/
-          # 修正为正确的 raw 域名，直接拉取原作者过滤清洗好的纯净电信库
-          curl -fsSL https://githubusercontent.com > ./bestcf/ctcc-ip.txt
+          echo "162.159.35.20#BJ-CT_v4_1" > ./bestcf/ctcc-ip.txt
+          echo "172.64.147.110#BJ-CT_v4_2" >> ./bestcf/ctcc-ip.txt
+          echo "172.64.155.159#BJ-CT_v4_3" >> ./bestcf/ctcc-ip.txt
+          echo "172.64.150.64#BJ-CT_v4_4" >> ./bestcf/ctcc-ip.txt
+          echo "172.64.144.224#BJ-CT_v4_5" >> ./bestcf/ctcc-ip.txt
+          echo "[2606:4700:53::ed49:aad6]#BJ-CT_v6_1" >> ./bestcf/ctcc-ip.txt
+          echo "[2a06:98c1:3105::c695:78d0]#BJ-CT_v6_2" >> ./bestcf/ctcc-ip.txt
+          echo "[2606:4700:52::e33a:8a05]#BJ-CT_v6_3" >> ./bestcf/ctcc-ip.txt
 
       - name: Push to branch
         run: |
