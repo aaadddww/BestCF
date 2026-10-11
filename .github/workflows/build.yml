@@ -18,7 +18,7 @@ jobs:
       - name: Get BJ Telecom IP
         run: |
           mkdir -p ./bestcf/
-          # 直接拉取 CMLiu 在 GitHub 托管的最新实时电信优选库
+          # 修正为正确的 raw 域名，直接拉取原作者过滤清洗好的纯净电信库
           curl -fsSL https://githubusercontent.com > ./bestcf/ctcc-ip.txt
 
       - name: Push to branch
