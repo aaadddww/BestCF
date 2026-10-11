@@ -18,9 +18,8 @@ jobs:
       - name: Get BJ Telecom IP
         run: |
           mkdir -p ./bestcf/
-          curl -fsSL https://hostmonit.com --data-raw '{"key":"iDetkOys"}' | jq -r '.info | select(.line == "CT" and (.province | contains("北京"))) | .ip' | awk '{print $0 "#BJ-CT_v4_" NR}' > ./bestcf/ctcc-ip.txt
-          curl -fsSL https://hostmonit.com --data-raw '{"key":"iDetkOys","type":"v6"}' | jq -r '.info | select(.line == "CT" and (.province | contains("北京"))) | .ip' | awk '{print "["$0"]#BJ-CT_v6_" NR}' >> ./bestcf/ctcc-ip.txt
-          curl -fsSL https://090227.xyz | sed 's/#.*//' | awk '{print $0 "#CT_Backup_" NR}' >> ./bestcf/ctcc-ip.txt
+          # 直接拉取 CMLiu 在 GitHub 托管的最新实时电信优选库
+          curl -fsSL https://githubusercontent.com > ./bestcf/ctcc-ip.txt
 
       - name: Push to branch
         run: |
